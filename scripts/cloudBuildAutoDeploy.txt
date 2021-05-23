@@ -1,0 +1,126 @@
+Git Hub access token
+Generate new token https://github.com/settings/tokens/new
+
+mkdir -p ~/.github
+echo "aws-bootstrap" > ~/.github/aws-bootstrap-repo
+echo "<username>" > ~/.github/aws-bootstrap-owner
+echo "<token>" > ~/.github/aws-bootstrap-access-token
+
+S3 bucket to store build artifact
+See setup.yml
+
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  CodePipelineBucket:
+    Type: String
+    Description: 'The S3 bucket for CodePipeline artifacts.'
+
+Resources:
+  CodePipelineS3Bucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Ref CodePipelineBucket
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+Add this to deploy-infra.sh
+              
+AWS_ACCOUNT_ID=`aws sts get-caller-identity --profile awsbootstrap \
+  --query "Account" --output text`
+CODEPIPELINE_BUCKET="$STACK_NAME-$REGION-codepipeline-$AWS_ACCOUNT_ID"      
+
+
+Deploy setup.yml from deploy-infra.sh
+
+echo -e "\n\n=========== Deploying setup.yml ==========="
+aws cloudformation deploy \
+  --region $REGION \
+  --profile $CLI_PROFILE \
+  --stack-name $STACK_NAME-setup \
+  --template-file setup.yml \
+  --no-fail-on-empty-changeset \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --parameter-overrides \
+    CodePipelineBucket=$CODEPIPELINE_BUCKET
+    
+    
+Start service
+#!/bin/bash -xe
+source /home/ec2-user/.bash_profile 
+cd /home/ec2-user/app/release 
+npm run start 
+
+
+Stop service
+
+#!/bin/bash -xe
+source /home/ec2-user/.bash_profile
+[ -d "/home/ec2-user/app/release" ] && \
+cd /home/ec2-user/app/release && \
+npm stop
+
+
+
+Use buildspec.yml to build app
+
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 10
+  pre_build:
+    commands:
+      # run 'npm install' using versions in package-lock.json
+      - npm ci
+  build:
+    commands:
+      - npm run build
+artifacts:
+  files:
+    - start-service.sh
+    - stop-service.sh
+    - server.js
+    - package.json
+    - appspec.yml
+    - 'node_modules/**/*'
+    
+Deploy artifacts created by Code Build using Code Deploy
+appspec.yml
+
+
+version: 0.0
+os: linux
+files:
+  # unzip the build artifact in ~/app
+  - source: /
+    destination: /home/ec2-user/app/release
+permissions:
+  # change permissions from root to ec2-user
+  - object: /home/ec2-user/app/release
+    pattern: "**"
+    owner: ec2-user
+    group: ec2-user
+hooks:
+  ApplicationStart:
+    # start the application
+    - location: start-service.sh
+      timeout: 300
+      runas: ec2-user
+  ApplicationStop:
+    # stop the application
+    - location: stop-service.sh
+      timeout: 300
+      runas: ec2-user
+      
+      
+      
