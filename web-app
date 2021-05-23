@@ -1,0 +1,50 @@
+mkdir aws-bootstrap && cd aws-bootstrap
+git init
+npm init -y
+
+
+const { hostname } = require('os');
+const http = require('http');
+const message = 'Hello World\n'; 
+const port = 8080; 
+const server = http.createServer((req, res) => { 
+  res.statusCode = 200;
+  res.setHeader('Content-Type', 'text/plain');
+  res.end(message);
+});
+  server.listen(port, hostname, () => {
+    console.log(`Server running at http://${hostname()}:${port}/`);
+});
+
+
+node server.js
+Server running at http://localhost:8080/
+
+
+curl localhost:8080
+Hello World
+
+package.json
+{
+  "name": "aws-bootstrap",
+      "version": "1.0.0",
+      "description": "",
+      "main": "server.js",
+      "scripts": {
+  "start": "node ./node_modules/pm2/bin/pm2 start ./server.js --name hello_aws --log ../logs/app.log ", 
+  "stop": "node ./node_modules/pm2/bin/pm2 stop hello_aws", 
+  "build": "echo 'Building...'"  },
+  "dependencies": { 
+    "pm2": "^4.2.0" 
+  } 
+}
+
+npm install
+
+mkdir ../logs
+
+npm start
+git add server.js package.json package-lock.json
+git commit -m "Create basic hello world web application"
+git remote add origin https://github.com/<username>/aws-boostrap.git
+git push -u origin master
